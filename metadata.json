@@ -1,0 +1,6 @@
+{
+  "name": "Guardrail Prompt Monitoring",
+  "description": "An enterprise prompt security and monitoring system that applies multi-layered safety, compliance, PII, and token usage checks to outgoing AI requests.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
