@@ -287,7 +287,10 @@ export default function SecurityPolicyTab({
                             const updated = { ...config, openaiBaseUrl: e.target.value };
                             setConfig(updated);
                           }}
-                          onBlur={() => handleSaveConfig(config)}
+                          onBlur={(e) => {
+                            const updated = { ...config, openaiBaseUrl: e.target.value };
+                            handleSaveConfig(updated);
+                          }}
                           className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-3 text-xs font-semibold focus:outline-none focus:border-indigo-500 text-slate-800"
                           placeholder="http://localhost:1234/v1"
                         />
@@ -302,7 +305,10 @@ export default function SecurityPolicyTab({
                             const updated = { ...config, openaiApiKey: e.target.value };
                             setConfig(updated);
                           }}
-                          onBlur={() => handleSaveConfig(config)}
+                          onBlur={(e) => {
+                            const updated = { ...config, openaiApiKey: e.target.value };
+                            handleSaveConfig(updated);
+                          }}
                           className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-3 text-xs font-semibold focus:outline-none focus:border-indigo-500 text-slate-800"
                           placeholder="Enter your-lm-studio-token-here..."
                         />

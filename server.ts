@@ -96,14 +96,59 @@ function getOpenAIClient(apiKey: string, baseUrl: string): OpenAI {
   return cachedOpenAI;
 }
 
+// Default configuration for schema merging and fallbacks
+const DEFAULT_CONFIG = {
+  maxTokenLimit: 1500,
+  maxTokenAction: "alarm",
+  piiAction: "block",
+  customKeywords: ["confidential_project_x", "supersecretkey123", "internal-only-db"],
+  enabledChecks: {
+    tech: true,
+    compliance: true,
+    safety: true,
+    context: true,
+    pii: true,
+    tokens: true
+  },
+  piiPatterns: [
+    { id: "email", name: "Email Address", pattern: "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", enabled: true, severity: "block" },
+    { id: "phone", name: "Phone Number", pattern: "(\\+?\\d{1,3}[- .]?)?\\(?[0-9]{3}\\)?[- .]?[0-9]{3}[- .]?[0-9]{4}", enabled: true, severity: "block" },
+    { id: "credit_card", name: "Credit Card", pattern: "\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|6(?:011|5[0-9][0-9])[0-9]{12}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\\d{3})\\d{11})\\b", enabled: true, severity: "block" },
+    { id: "ssn", name: "Social Security Number (SSN)", pattern: "\\b\\d{3}-\\d{2}-\\d{4}\\b", enabled: true, severity: "block" },
+    { id: "ip_address", name: "IPv4 Address", pattern: "\\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b", enabled: true, severity: "alarm" }
+  ],
+  aiProvider: "gemini",
+  openaiApiKey: "",
+  openaiBaseUrl: "http://localhost:1234/v1",
+  disableAiEvaluation: false
+};
+
+function getConfig() {
+  ensureDataSetup();
+  try {
+    const configData = fs.readFileSync(CONFIG_PATH, "utf-8");
+    const parsed = JSON.parse(configData);
+    return {
+      ...DEFAULT_CONFIG,
+      ...parsed,
+      enabledChecks: {
+        ...DEFAULT_CONFIG.enabledChecks,
+        ...(parsed.enabledChecks || {})
+      },
+      piiPatterns: parsed.piiPatterns || DEFAULT_CONFIG.piiPatterns
+    };
+  } catch (error) {
+    return DEFAULT_CONFIG;
+  }
+}
+
 // 1. GET Config
 app.get("/api/guardrail/config", (req, res) => {
   try {
-    ensureDataSetup();
-    const configData = fs.readFileSync(CONFIG_PATH, "utf-8");
-    res.json(JSON.parse(configData));
+    const config = getConfig();
+    res.json(config);
   } catch (error: any) {
-    res.status(500).json({ error: "Failed to loaded config", details: error.message });
+    res.status(500).json({ error: "Failed to load config", details: error.message });
   }
 });
 
@@ -192,8 +237,7 @@ app.post("/api/guardrail/check", async (req, res) => {
     return res.status(400).json({ error: "Prompt must be a string or is missing." });
   }
 
-  ensureDataSetup();
-  const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+  const config = getConfig();
 
   // Calculate metrics
   const charCount = prompt.length;
@@ -486,7 +530,7 @@ Assign a 'score' from 0.0 (completely clean/safe) to 1.0 (extremely high risk/un
       }
 
     } catch (llmError: any) {
-      console.error("Advanced LLM Guardian check failed or key is offline:", llmError.message);
+      console.log("Advanced LLM Guardian check failed or key is offline:", llmError.message);
       skippedAiReason = "Advanced LLM offline/error. Proceeded with local regex check engine.";
       
       // Fallback details reflecting skipped state
