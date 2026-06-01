@@ -20,6 +20,10 @@ export interface GuardrailConfig {
     tokens: boolean; // Token-waste
   };
   piiPatterns: PIIPattern[];
+  aiProvider?: "gemini" | "openai";
+  openaiApiKey?: string;
+  openaiBaseUrl?: string;
+  disableAiEvaluation?: boolean;
 }
 
 export interface CheckDetail {

@@ -14,7 +14,7 @@ import {
   Activity,
   Code
 } from "lucide-react";
-import { GuardrailResult } from "../types";
+import { GuardrailResult, GuardrailConfig } from "../types";
 
 interface SandboxTabProps {
   testPrompt: string;
@@ -27,6 +27,7 @@ interface SandboxTabProps {
   evaluationResult: GuardrailResult | null;
   setEvaluationResult: (res: GuardrailResult | null) => void;
   handleTestPrompt: () => void;
+  config: GuardrailConfig;
 }
 
 export default function SandboxTab({
@@ -40,6 +41,7 @@ export default function SandboxTab({
   evaluationResult,
   setEvaluationResult,
   handleTestPrompt,
+  config
 }: SandboxTabProps) {
 
   // Load standard scenario presets
@@ -343,8 +345,12 @@ export default function SandboxTab({
             </div>
 
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-              <span className="font-semibold">ACTIVE ENGINE NO 4</span>
-              <span className="font-mono">GEMINI-3.5 CLASSIFIER</span>
+              <span className="font-semibold">EVALUATION SYSTEM STATUS</span>
+              <span className="font-mono uppercase font-bold text-indigo-600">
+                {config?.disableAiEvaluation 
+                  ? "Local Metrics Only" 
+                  : (config?.aiProvider === "openai" ? "OpenAI Classifier" : "Gemini Classifier")}
+              </span>
             </div>
           </div>
         </div>

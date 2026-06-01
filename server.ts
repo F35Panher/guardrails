@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
+import { OpenAI } from "openai";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -42,7 +43,11 @@ function ensureDataSetup() {
         { id: "credit_card", name: "Credit Card", pattern: "\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|6(?:011|5[0-9][0-9])[0-9]{12}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\\d{3})\\d{11})\\b", enabled: true, severity: "block" },
         { id: "ssn", name: "Social Security Number (SSN)", pattern: "\\b\\d{3}-\\d{2}-\\d{4}\\b", enabled: true, severity: "block" },
         { id: "ip_address", name: "IPv4 Address", pattern: "\\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b", enabled: true, severity: "alarm" }
-      ]
+      ],
+      aiProvider: "gemini",
+      openaiApiKey: "",
+      openaiBaseUrl: "http://localhost:1234/v1",
+      disableAiEvaluation: false
     };
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(defaultConfig, null, 2), "utf-8");
   }
@@ -72,6 +77,23 @@ function getGeminiClient(): GoogleGenAI {
     });
   }
   return aiClient;
+}
+
+// Helper to get OpenAI client dynamically based on config
+let cachedOpenAI: OpenAI | null = null;
+let cachedOpenAIApiKey = "";
+let cachedOpenAIBaseUrl = "";
+
+function getOpenAIClient(apiKey: string, baseUrl: string): OpenAI {
+  if (!cachedOpenAI || cachedOpenAIApiKey !== apiKey || cachedOpenAIBaseUrl !== baseUrl) {
+    cachedOpenAIApiKey = apiKey;
+    cachedOpenAIBaseUrl = baseUrl;
+    cachedOpenAI = new OpenAI({
+      apiKey: apiKey || "placeholder-key",
+      baseURL: baseUrl || undefined,
+    });
+  }
+  return cachedOpenAI;
 }
 
 // 1. GET Config
@@ -298,16 +320,15 @@ app.post("/api/guardrail/check", async (req, res) => {
   }
 
   // --- ADVANCED AI EVAL FROM LLM ---
-  // Only proceed if we haven't already blocked it by fast checks!
+  // Only proceed if we haven't already blocked it by fast checks, and it is not disabled!
   const skipLlm = !overallPassed || 
+    !!config.disableAiEvaluation ||
     !(config.enabledChecks.tech || config.enabledChecks.compliance || config.enabledChecks.safety || config.enabledChecks.context);
 
   let skippedAiReason = "";
 
   if (!skipLlm) {
     try {
-      const ai = getGeminiClient();
-      
       const contents = `You are a high-performance corporate Prompt Guardrail Analysis engine checking user prompts passed to an AI model.
 Analyze the following prompt submitted by a user:
 
@@ -329,58 +350,84 @@ Evaluate each of the following enabled dimensions. Report the results strictly a
 
 Assign a 'score' from 0.0 (completely clean/safe) to 1.0 (extremely high risk/unsafe) and a clear, short 'reason' representing findings. If a check is safe, set passed to true, score close to 0.0, and a safe reason.`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              tech: {
-                type: Type.OBJECT,
-                properties: {
-                  passed: { type: Type.BOOLEAN },
-                  score: { type: Type.NUMBER },
-                  reason: { type: Type.STRING }
-                },
-                required: ["passed", "score", "reason"]
-              },
-              compliance: {
-                type: Type.OBJECT,
-                properties: {
-                  passed: { type: Type.BOOLEAN },
-                  score: { type: Type.NUMBER },
-                  reason: { type: Type.STRING }
-                },
-                required: ["passed", "score", "reason"]
-              },
-              safety: {
-                type: Type.OBJECT,
-                properties: {
-                  passed: { type: Type.BOOLEAN },
-                  score: { type: Type.NUMBER },
-                  reason: { type: Type.STRING }
-                },
-                required: ["passed", "score", "reason"]
-              },
-              context: {
-                type: Type.OBJECT,
-                properties: {
-                  passed: { type: Type.BOOLEAN },
-                  score: { type: Type.NUMBER },
-                  reason: { type: Type.STRING }
-                },
-                required: ["passed", "score", "reason"]
-              }
+      let resultObj: any = {};
+      if (config.aiProvider === "openai") {
+        const openai = getOpenAIClient(config.openaiApiKey, config.openaiBaseUrl);
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: "You are a high-performance corporate Prompt Guardrail Analysis engine. You must analyze the user prompt and respond ONLY with a valid JSON object matching the requested schema. Do not output markdown codeblocks around the JSON, return the raw JSON object structure."
             },
-            required: ["tech", "compliance", "safety", "context"]
+            {
+              role: "user",
+              content: contents + "\n\nResponse must be a parsed JSON object matching this structure:\n" + JSON.stringify({
+                tech: { passed: true, score: 0.1, reason: "Text reason" },
+                compliance: { passed: true, score: 0.1, reason: "Text reason" },
+                safety: { passed: true, score: 0.1, reason: "Text reason" },
+                context: { passed: true, score: 0.1, reason: "Text reason" }
+              })
+            }
+          ],
+          response_format: { type: "json_object" }
+        });
+        const rawText = completion.choices[0]?.message?.content || "{}";
+        resultObj = JSON.parse(rawText.trim());
+      } else {
+        const ai = getGeminiClient();
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                tech: {
+                  type: Type.OBJECT,
+                  properties: {
+                    passed: { type: Type.BOOLEAN },
+                    score: { type: Type.NUMBER },
+                    reason: { type: Type.STRING }
+                  },
+                  required: ["passed", "score", "reason"]
+                },
+                compliance: {
+                  type: Type.OBJECT,
+                  properties: {
+                    passed: { type: Type.BOOLEAN },
+                    score: { type: Type.NUMBER },
+                    reason: { type: Type.STRING }
+                  },
+                  required: ["passed", "score", "reason"]
+                },
+                safety: {
+                  type: Type.OBJECT,
+                  properties: {
+                    passed: { type: Type.BOOLEAN },
+                    score: { type: Type.NUMBER },
+                    reason: { type: Type.STRING }
+                  },
+                  required: ["passed", "score", "reason"]
+                },
+                context: {
+                  type: Type.OBJECT,
+                  properties: {
+                    passed: { type: Type.BOOLEAN },
+                    score: { type: Type.NUMBER },
+                    reason: { type: Type.STRING }
+                  },
+                  required: ["passed", "score", "reason"]
+                }
+              },
+              required: ["tech", "compliance", "safety", "context"]
+            }
           }
-        }
-      });
-
-      const rawText = response.text || "{}";
-      const resultObj = JSON.parse(rawText.trim());
+        });
+        const rawText = response.text || "{}";
+        resultObj = JSON.parse(rawText.trim());
+      }
 
       // Update checks details if enabled
       if (config.enabledChecks.tech) {
@@ -456,6 +503,8 @@ Assign a 'score' from 0.0 (completely clean/safe) to 1.0 (extremely high risk/un
     // LLM skipped because earlier rules blocked it or AI checks were manually turned off
     skippedAiReason = !overallPassed 
       ? "AI analysis skipped: request already rejected by fast pre-filtering layer."
+      : !!config.disableAiEvaluation
+      ? "Advanced AI evaluations are disabled altogether in policy settings."
       : "AI active analyses manually disabled in configuration.";
     
     if (config.enabledChecks.tech) techDetail = { passed: true, score: 0, reason: skippedAiReason };

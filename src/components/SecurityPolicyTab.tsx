@@ -10,7 +10,8 @@ import {
   RefreshCw,
   Eye,
   Shield,
-  HelpCircle
+  HelpCircle,
+  Server
 } from "lucide-react";
 import { GuardrailConfig } from "../types";
 
@@ -187,6 +188,146 @@ export default function SecurityPolicyTab({
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* Section 04: Advanced AI Evaluation Provider & Credentials */}
+          <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                <Server className="w-4 h-4 text-indigo-600" />
+                <span>04. Advanced AI Evaluation engine & Credentials</span>
+              </h3>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-505">Evaluation:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = { ...config, disableAiEvaluation: !config.disableAiEvaluation };
+                    setConfig(updated);
+                    handleSaveConfig(updated);
+                  }}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    !config.disableAiEvaluation ? "bg-indigo-600" : "bg-slate-300"
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      !config.disableAiEvaluation ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+                <span className="text-xs font-bold text-slate-700 w-12">
+                  {!config.disableAiEvaluation ? "ACTIVE" : "OFF"}
+                </span>
+              </div>
+            </div>
+
+            {config.disableAiEvaluation ? (
+              <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl text-amber-800">
+                <p className="text-xs font-semibold leading-relaxed">
+                  ⚠️ <strong>Master Switch Off:</strong> Advanced LLM Validation layers are deactivated. The gateway will function purely on fast local Regex scanning and static Keyword lists.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Select AI Provider Service</label>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = { ...config, aiProvider: "gemini" as const };
+                        setConfig(updated);
+                        handleSaveConfig(updated);
+                      }}
+                      className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        (config.aiProvider || "gemini") === "gemini"
+                          ? "bg-white text-indigo-700 shadow-xs border border-indigo-100"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                      Google Gemini
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = { ...config, aiProvider: "openai" as const };
+                        setConfig(updated);
+                        handleSaveConfig(updated);
+                      }}
+                      className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        config.aiProvider === "openai"
+                          ? "bg-white text-emerald-700 shadow-xs border border-emerald-100"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      OpenAI / Local LLM
+                    </button>
+                  </div>
+                </div>
+
+                {config.aiProvider === "openai" ? (
+                  <div className="space-y-3.5 bg-slate-50/55 p-4 rounded-xl border border-slate-200 mt-2">
+                    <p className="text-[11px] font-bold text-slate-500 mb-1 flex items-center gap-1">
+                      <span className="shrink-0 inline-block w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                      Configure Endpoint (e.g. OpenAI service or local LM Studio):
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">Base URL</label>
+                        <input
+                          type="text"
+                          value={config.openaiBaseUrl || ""}
+                          onChange={(e) => {
+                            const updated = { ...config, openaiBaseUrl: e.target.value };
+                            setConfig(updated);
+                          }}
+                          onBlur={() => handleSaveConfig(config)}
+                          className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-3 text-xs font-semibold focus:outline-none focus:border-indigo-500 text-slate-800"
+                          placeholder="http://localhost:1234/v1"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">API Secret Token / Key</label>
+                        <input
+                          type="password"
+                          value={config.openaiApiKey || ""}
+                          onChange={(e) => {
+                            const updated = { ...config, openaiApiKey: e.target.value };
+                            setConfig(updated);
+                          }}
+                          onBlur={() => handleSaveConfig(config)}
+                          className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-3 text-xs font-semibold focus:outline-none focus:border-indigo-500 text-slate-800"
+                          placeholder="Enter your-lm-studio-token-here..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 text-[10px] font-mono text-slate-350 p-3 rounded-lg border border-slate-800 mt-1 space-y-1">
+                      <p className="text-emerald-400 font-bold">// Usage Example:</p>
+                      <p className="text-slate-200 font-medium">from openai import OpenAI</p>
+                      <p className="text-slate-200 font-medium">client = OpenAI(</p>
+                      <p className="text-slate-200 font-medium font-semibold pl-4">base_url="{config.openaiBaseUrl || 'http://localhost:1234/v1'}",</p>
+                      <p className="text-slate-200 font-medium font-semibold pl-4">api_key="{config.openaiApiKey ? '••••••••' : 'your-lm-studio-token-here'}"</p>
+                      <p className="text-slate-200 font-medium">)</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex items-start gap-2.5">
+                    <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shrink-0"></div>
+                    <div className="text-[11px] text-slate-505 text-slate-500 leading-relaxed">
+                      Powered by the native enterprise integration key for Google Gemini model, bypassing local endpoint fields. Ensure the <strong>GEMINI_API_KEY</strong> environment variable is defined.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Section 02: Verification layers switches */}

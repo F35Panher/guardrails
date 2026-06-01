@@ -41,7 +41,11 @@ export default function App() {
       pii: true,
       tokens: true
     },
-    piiPatterns: []
+    piiPatterns: [],
+    aiProvider: "gemini",
+    openaiApiKey: "",
+    openaiBaseUrl: "http://localhost:1234/v1",
+    disableAiEvaluation: false
   });
 
   // Playground variables
@@ -182,6 +186,7 @@ export default function App() {
               evaluationResult={evaluationResult}
               setEvaluationResult={setEvaluationResult}
               handleTestPrompt={handleTestPrompt}
+              config={config}
             />
           )}
 
